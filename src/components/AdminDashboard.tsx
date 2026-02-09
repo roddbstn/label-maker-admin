@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Submission } from '../types/submission';
 
 export default function AdminDashboard({
@@ -11,10 +11,63 @@ export default function AdminDashboard({
     error?: string | null;
 }) {
     const [filter, setFilter] = useState<'all' | 'waitlist' | 'feedback'>('all');
+    const [startDate, setStartDate] = useState<string>('');
+    const [endDate, setEndDate] = useState<string>('');
+    const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 20;
 
-    const filteredSubmissions = initialSubmissions.filter(sub =>
-        filter === 'all' ? true : sub.type === filter
+    // 날짜 필터링 + 타입 필터링 + 정렬
+    const filteredSubmissions = useMemo(() => {
+        return initialSubmissions
+            .filter(sub => filter === 'all' ? true : sub.type === filter)
+            .filter(sub => {
+                if (!startDate) return true;
+                const subDate = new Date(sub.createdAt);
+                const start = new Date(startDate);
+                start.setHours(0, 0, 0, 0);
+                const end = endDate ? new Date(endDate) : new Date(startDate);
+                end.setHours(23, 59, 59, 999);
+                return subDate >= start && subDate <= end;
+            })
+            .sort((a, b) => {
+                const diff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+                return sortOrder === 'desc' ? diff : -diff;
+            });
+    }, [initialSubmissions, filter, startDate, endDate, sortOrder]);
+
+    // 페이지네이션 계산
+    const totalPages = Math.max(1, Math.ceil(filteredSubmissions.length / ITEMS_PER_PAGE));
+    const paginatedSubmissions = filteredSubmissions.slice(
+        (currentPage - 1) * ITEMS_PER_PAGE,
+        currentPage * ITEMS_PER_PAGE
     );
+
+    // 필터 변경 시 페이지 리셋
+    const handleFilterChange = (newFilter: 'all' | 'waitlist' | 'feedback') => {
+        setFilter(newFilter);
+        setCurrentPage(1);
+    };
+
+    const handleDateChange = (type: 'start' | 'end', value: string) => {
+        if (type === 'start') {
+            setStartDate(value);
+        } else {
+            setEndDate(value);
+        }
+        setCurrentPage(1);
+    };
+
+    const clearDateFilter = () => {
+        setStartDate('');
+        setEndDate('');
+        setCurrentPage(1);
+    };
+
+    const toggleSortOrder = () => {
+        setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
+        setCurrentPage(1);
+    };
 
     const exportToCSV = () => {
         const headers = ['날짜', '구분', '이메일', '피드백', '기관명'];
@@ -68,11 +121,46 @@ export default function AdminDashboard({
                 </div>
             )}
 
+            {/* 날짜 필터 + 정렬 */}
+            <div className="mb-4 flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-slate-200 shadow-sm">
+                    <span className="text-sm text-slate-500">📅</span>
+                    <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => handleDateChange('start', e.target.value)}
+                        className="text-sm border-none outline-none bg-transparent"
+                    />
+                    <span className="text-slate-400">~</span>
+                    <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => handleDateChange('end', e.target.value)}
+                        className="text-sm border-none outline-none bg-transparent"
+                    />
+                    {(startDate || endDate) && (
+                        <button
+                            onClick={clearDateFilter}
+                            className="ml-1 text-xs text-slate-400 hover:text-red-500"
+                        >
+                            ✕
+                        </button>
+                    )}
+                </div>
+                <button
+                    onClick={toggleSortOrder}
+                    className="flex items-center gap-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 shadow-sm"
+                >
+                    정렬: {sortOrder === 'desc' ? '최신순 ↓' : '오래된순 ↑'}
+                </button>
+            </div>
+
+            {/* 타입 필터 */}
             <div className="mb-6 flex gap-2">
                 {(['all', 'waitlist', 'feedback'] as const).map((type) => (
                     <button
                         key={type}
-                        onClick={() => setFilter(type)}
+                        onClick={() => handleFilterChange(type)}
                         className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${filter === type
                             ? 'bg-[#222222] text-white'
                             : 'bg-white text-slate-500 border border-slate-200 hover:border-slate-300'
@@ -83,6 +171,7 @@ export default function AdminDashboard({
                 ))}
             </div>
 
+            {/* 테이블 */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
@@ -95,14 +184,14 @@ export default function AdminDashboard({
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {filteredSubmissions.length === 0 ? (
+                            {paginatedSubmissions.length === 0 ? (
                                 <tr>
                                     <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
                                         데이터가 없습니다.
                                     </td>
                                 </tr>
                             ) : (
-                                filteredSubmissions.map((sub) => (
+                                paginatedSubmissions.map((sub) => (
                                     <tr key={sub.id} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
                                             {new Date(sub.createdAt).toLocaleString('ko-KR')}
@@ -130,6 +219,29 @@ export default function AdminDashboard({
                     </table>
                 </div>
             </div>
+
+            {/* 페이지네이션 */}
+            {totalPages > 1 && (
+                <div className="mt-6 flex justify-center items-center gap-4">
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                        className="px-4 py-2 text-sm font-medium bg-white border border-slate-200 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
+                    >
+                        ← 이전
+                    </button>
+                    <span className="text-sm text-slate-600">
+                        페이지 {currentPage} / {totalPages}
+                    </span>
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        className="px-4 py-2 text-sm font-medium bg-white border border-slate-200 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
+                    >
+                        다음 →
+                    </button>
+                </div>
+            )}
         </div>
     );
 }
