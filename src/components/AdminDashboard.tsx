@@ -3,7 +3,13 @@
 import { useState } from 'react';
 import { Submission } from '../types/submission';
 
-export default function AdminDashboard({ initialSubmissions }: { initialSubmissions: Submission[] }) {
+export default function AdminDashboard({
+    initialSubmissions,
+    error = null
+}: {
+    initialSubmissions: Submission[];
+    error?: string | null;
+}) {
     const [filter, setFilter] = useState<'all' | 'waitlist' | 'feedback'>('all');
 
     const filteredSubmissions = initialSubmissions.filter(sub =>
@@ -55,6 +61,12 @@ export default function AdminDashboard({ initialSubmissions }: { initialSubmissi
                     </button>
                 </div>
             </header>
+
+            {error && (
+                <div className="mb-6 px-4 py-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm font-medium flex items-center gap-2">
+                    <span className="text-lg">⚠️</span> {error}
+                </div>
+            )}
 
             <div className="mb-6 flex gap-2">
                 {(['all', 'waitlist', 'feedback'] as const).map((type) => (

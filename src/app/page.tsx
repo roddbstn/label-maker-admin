@@ -3,9 +3,10 @@ import { Submission } from '@/types/submission';
 
 export const dynamic = 'force-dynamic';
 
-async function getSubmissions(): Promise<Submission[]> {
-  // Production URL as default, can be overridden with NEXT_PUBLIC_API_URL env var
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://label-maker-olive.vercel.app';
+async function getSubmissions(): Promise<{ data: Submission[]; error: string | null }> {
+  const API_URL =
+    process.env.NEXT_PUBLIC_API_URL ||
+    'https://label-maker-olive.vercel.app';
 
   try {
     const res = await fetch(`${API_URL}/api/submissions`, {
@@ -16,23 +17,24 @@ async function getSubmissions(): Promise<Submission[]> {
     });
 
     if (!res.ok) {
-      throw new Error('Failed to fetch data');
+      return { data: [], error: `API 오류 (${res.status})` };
     }
 
-    return res.json();
+    const data = await res.json();
+    return { data, error: null };
   } catch (error) {
-    console.error('Error fetching submissions:', error);
-    return [];
+    console.error('[Admin Error] Data fetching failed:', error);
+    return { data: [], error: '서버와 연결할 수 없습니다.' };
   }
 }
 
 export default async function Home() {
-  const submissions = await getSubmissions();
+  const { data: submissions, error } = await getSubmissions();
   const sortedSubmissions = [...submissions].reverse();
 
   return (
     <main className="min-h-screen bg-slate-50 p-8">
-      <AdminDashboard initialSubmissions={sortedSubmissions} />
+      <AdminDashboard initialSubmissions={sortedSubmissions} error={error} />
     </main>
   );
 }
