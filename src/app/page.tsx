@@ -7,7 +7,11 @@ async function getSubmissions(): Promise<{ data: Submission[]; error: string | n
   // 환경변수가 비어있거나 설정되지 않은 경우를 대비해 더 강력한 폴백 처리
   let API_URL = (process.env.NEXT_PUBLIC_API_URL || '').trim();
 
-  if (!API_URL || API_URL === 'undefined' || !API_URL.startsWith('http')) {
+  // 잘못된 도메인이 설정되어 있거나 비어있는 경우 올바른 주소로 강제 전환
+  if (!API_URL ||
+    API_URL === 'undefined' ||
+    !API_URL.startsWith('http') ||
+    API_URL.includes('label-maker.vercel.app')) {
     API_URL = 'https://label-maker-olive.vercel.app';
   }
 
