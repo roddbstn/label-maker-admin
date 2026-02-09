@@ -4,7 +4,8 @@ import { Submission } from '@/types/submission';
 export const dynamic = 'force-dynamic';
 
 async function getSubmissions(): Promise<Submission[]> {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+  // Production URL as default, can be overridden with NEXT_PUBLIC_API_URL env var
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://label-maker-olive.vercel.app';
 
   try {
     const res = await fetch(`${API_URL}/api/submissions`, {
